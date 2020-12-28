@@ -223,7 +223,9 @@ function step(state) {
   } else {
     throw("impossible state " + state.phase)
   }
-  window.setTimeout(step, 100, state)
+  if (state.n < 100) {
+    window.setTimeout(step, 100, state)
+  }
 }
 
 
