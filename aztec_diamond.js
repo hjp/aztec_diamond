@@ -126,7 +126,7 @@ function sanitize(state) {
     const i = t[0].x + n - 0.5
     const j = t[0].y + n - 0.5
     const oi = i + direction.x
-    const oj = i + direction.y
+    const oj = j + direction.y
     const oti = state.board[oj][oi]
     if (oti === undefined) {
       // no neighbour
