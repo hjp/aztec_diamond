@@ -157,6 +157,50 @@ function move_tiles(state) {
   return state
 }
 
+function assert(b) {
+  if (!b) {
+    throw("assertion failed")
+  }
+}
+
+function fill_gaps(state) {
+  n = state.n
+  // state.board is inconsistent after move, so we recompute it
+  board = tile_board(n, state.tiles)
+  tiles = [...state.tiles]
+  for (y = 0.5 - n; y < n; y += 1) {
+    for (x = 0.5 - n; x < n; x += 1) {
+      if (Math.abs(x) + Math.abs(y) <= n) {
+        const i = x + n - 0.5
+        const j = y + n - 0.5
+        if (board[j][i] === undefined) {
+          assert(board[j][i+1] == undefined)
+          assert(board[j+1][i] == undefined)
+          assert(board[j+1][i+1] == undefined)
+          if (Math.random() >= 0.5) {
+            // split vertically
+            tiles.push([{x: x+1, y: y+1}, {x: x+1, y: y}])
+            tiles.push([{x: x,   y: y},   {x: x,   y: y+1}])
+
+          } else {
+            tiles.push([{x: x,   y: y+1}, {x: x+1, y: y+1}])
+            tiles.push([{x: x+1, y: y},   {x: x,   y: y  }])
+          }
+          // mark cells as in use. Don't care about tile numbers,
+          // we'll recompute anyway
+          board[j][i] = -1
+          board[j][i+1] = -1
+          board[j+1][i] = -1
+          board[j+1][i+1] = -1
+        }
+      }
+    }
+  }
+  board = tile_board(n, tiles)
+  state = {...state, tiles, board, phase: "shrink", shrink: 0}
+  return state
+}
+
 function step(state) {
   draw(state)
   if (state.phase == "shrink") {
