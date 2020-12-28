@@ -5,18 +5,7 @@ canvas.width = size
 canvas.height = size
 const ctx = canvas.getContext("2d")
 
-function ad_1() {
-  console.log("ad_1")
-  const n = 1
-  let tiles;
-  if (Math.random() >= 0.5) {
-    // split vertically
-    tiles = [[{x:  0.5, y:  0.5}, {x:  0.5, y: -0.5}],
-             [{x: -0.5, y: -0.5}, {x: -0.5, y:  0.5}]]
-  } else {
-    tiles = [[{x: -0.5, y:  0.5}, {x:  0.5, y:  0.5}],
-             [{x:  0.5, y: -0.5}, {x: -0.5, y: -0.5}]]
-  }
+function tile_board(n, tiles) {
   let board = []
   // i tracks x, j tracks y. row major, so j is the outer loop.
   // That's a bit unusual, but I think more intuitive than the
@@ -35,7 +24,23 @@ function ad_1() {
       board[j][i] = ti
     }
   }
-  return {n, tiles, board}
+  return board
+}
+
+function ad_1() {
+  console.log("ad_1")
+  const n = 1
+  let tiles;
+  if (Math.random() >= 0.5) {
+    // split vertically
+    tiles = [[{x:  0.5, y:  0.5}, {x:  0.5, y: -0.5}],
+             [{x: -0.5, y: -0.5}, {x: -0.5, y:  0.5}]]
+  } else {
+    tiles = [[{x: -0.5, y:  0.5}, {x:  0.5, y:  0.5}],
+             [{x:  0.5, y: -0.5}, {x: -0.5, y: -0.5}]]
+  }
+  const board = tile_board(n, tiles)
+  return {n, tiles, board, shrink: 0, phase: "shrink"}
 }
 
 function x2sx(x, scale, size) {
@@ -65,16 +70,22 @@ function color(t) {
 }
 
 function draw(state) {
-  console.log("draw")
+  console.log("draw", state)
   const n = state.n
-  const scale = size / (2*n)
+  const scale = size / (2 * (n + state.shrink/8))
 
+  ctx.fillStyle = "#FFF8"
+  ctx.fillRect(0, 0, size, size)
+
+  ctx.beginPath()
   for (y = 0.5 - n; y < n; y += 1) {
     for (x = 0.5 - n; x < n; x += 1) {
-      sx = x2sx(x, scale, size)
-      sy = y2sy(y, scale, size)
-      console.log(x, y, sx, sy)
-      ctx.rect(sx, sy, scale, scale)
+      if (Math.abs(x) + Math.abs(y) <= n) {
+        sx = x2sx(x, scale, size)
+        sy = y2sy(y, scale, size)
+        console.log(x, y, sx, sy)
+        ctx.rect(sx, sy, scale, scale)
+      }
     }
   }
   ctx.strokeStyle = "#CCCCCC"
@@ -97,4 +108,80 @@ function draw(state) {
 
 }
 
-draw(ad_1())
+function expand(state) {
+  const n = state.n + 1
+  const board = tile_board(n, state.tiles)
+  state = {...state, n, board, shrink: 0}
+  return state
+}
+
+function sanitize(state) {
+  console.log("sanitize", state)
+  let tiles = []
+  const n = state.n
+  for (let ti = 0; ti < state.tiles.length; ti++) {
+    const t = state.tiles[ti];
+    console.log(ti, t)
+    const direction = {x: t[0].y - t[1].y, y: t[1].x - t[0].x}
+    const i = t[0].x + n - 0.5
+    const j = t[0].y + n - 0.5
+    const oi = i + direction.x
+    const oj = i + direction.y
+    const oti = state.board[oj][oi]
+    if (oti === undefined) {
+      // no neighbour
+      tiles.push(t)
+    } else {
+      const ot = state.tiles[oti]
+      const odirection = {x: ot[0].y - ot[1].y, y: ot[1].x - ot[0].x}
+      if (odirection.x == -direction.x && odirection.y == - direction.y) {
+        // Omit this tile. ot will also be omitted
+      } else {
+        tiles.push(t)
+      }
+    }
+  }
+  state = {...state, tiles, phase: "move", move: 0}
+  return state
+}
+
+function move_tiles(state) {
+  console.log("move_tiles", state)
+  let tiles = []
+  for (t of state.tiles) {
+    const direction = {x: t[0].y - t[1].y, y: t[1].x - t[0].x}
+    tiles.push([{x: t[0].x + direction.x / 8, y: t[0].y + direction.y / 8},
+                {x: t[1].x + direction.x / 8, y: t[1].y + direction.y / 8}, ])
+  }
+  state = {...state, tiles, move: state.move + 1}
+  return state
+}
+
+function step(state) {
+  draw(state)
+  if (state.phase == "shrink") {
+    if (state.shrink < 8) {
+      state = {...state, shrink: state.shrink + 1}
+    } else {
+      state = {...state, phase: "sanitize"}
+    }
+  } else if (state.phase == "sanitize") {
+    state = expand(state)
+    state = sanitize(state)
+  } else if (state.phase == "move") {
+    if (state.move < 8) {
+      state = move_tiles(state)
+    } else {
+      state = {...state, phase: "fill"}
+    }
+  } else if (state.phase = "fill") {
+    state = fill_gaps(state)
+  } else {
+    throw("impossible state " + state.phase)
+  }
+  window.setTimeout(step, 100, state)
+}
+
+
+initial_state = ad_1()
+window.setTimeout(step, 100, initial_state)
